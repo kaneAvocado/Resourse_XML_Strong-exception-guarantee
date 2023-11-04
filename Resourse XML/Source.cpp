@@ -1,73 +1,100 @@
 #include <iostream>
+#include <functional>
 #include <fstream>
-#include <stack>
-#include <vector>
 #include <memory>
+#include <sstream>
 #include <string>
+#include <vector>
 
-struct XmlNode {
+class XMLNode {
+public:
+    using XMLNodePtr = std::shared_ptr<XMLNode>;
+
+private:
     std::string name;
     std::string value;
-    std::vector<std::shared_ptr<XmlNode>> children;
+    std::vector<XMLNodePtr> children;
+    XMLNodePtr parent;
+
+public:
+    XMLNode(const std::string& nodeName, const std::string& nodeValue, XMLNodePtr parentNode = nullptr)
+        : name(nodeName), value(nodeValue), parent(std::move(parentNode)) {}
+
+    std::string getName() const { return name; }
+    std::string getValue() const { return value; }
+    const std::vector<XMLNodePtr>& getChildren() const { return children; }
+
+    XMLNodePtr getParent() const {
+        return parent;
+    }
 };
 
-std::shared_ptr<XmlNode> parseXml(std::istream& input) {
-    std::stack<std::shared_ptr<XmlNode>> stack;
-    std::string line;
-    std::shared_ptr<XmlNode> root, currentNode;
+// Простой класс для парсинга XML
+class XMLParser {
+public:
+    XMLNode::XMLNodePtr parseXML(const std::string& filename) {
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file");
+        }
 
-    while (getline(input, line)) {
-        size_t startTagPos = line.find('<');
-        size_t endTagPos = line.find('>', startTagPos);
-        if (startTagPos != std::string::npos && endTagPos != std::string::npos) {
-            if (line[startTagPos + 1] != '/') { // start tag
-                currentNode = std::make_shared<XmlNode>();
-                currentNode->name = line.substr(startTagPos + 1, endTagPos - startTagPos - 1);
-                if (!stack.empty()) {
-                    stack.top()->children.push_back(currentNode);
+        XMLNode::XMLNodePtr root;
+        XMLNode::XMLNodePtr currentNode;
+
+        std::string line;
+        while (std::getline(file, line)) {
+            // Базовая обработка для открытия и закрытия тегов
+            if (line.find('<') != std::string::npos && line.find("</") == std::string::npos) {
+                size_t startPos = line.find('<') + 1;
+                size_t endPos = line.find('>');
+                std::string tagName = line.substr(startPos, endPos - startPos);
+                // Упрощенная логика: предполагается, что за открывающим тегом следует значение
+                std::getline(file, line);
+                std::string value = line;
+                auto node = std::make_shared<XMLNode>(tagName, value, currentNode);
+                if (!currentNode) {  // Это корневой узел
+                    root = node;
                 }
-                stack.push(currentNode);
-                if (!root) {
-                    root = currentNode;
-                }
+                currentNode = node;  // Настраиваем текущий узел для добавления детей
             }
-            else { // end tag
-                if (!stack.empty()) {
-                    currentNode = stack.top();
-                    stack.pop();
-                }
+            else if (line.find("</") != std::string::npos) {
+                currentNode = currentNode->getParent();  // Возвращаемся к родителю
             }
         }
-        else {
-            if (!stack.empty()) {
-                currentNode->value += line;
-            }
-        }
-    }
-    return root;
-}
 
-void printXml(const std::shared_ptr<XmlNode>& node, int depth = 0) {
-    std::cout << std::string(depth, ' ') << node->name << ": " << node->value << "\n";
-    for (const auto& child : node->children) {
-        printXml(child, depth + 2);
+        return root;
     }
+};
+
+// Функция для сохранения XML
+void saveXML(const XMLNode::XMLNodePtr& root, const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open file for writing");
+    }
+
+    std::function<void(const XMLNode::XMLNodePtr&, size_t)> writeNode;
+    writeNode = [&](const XMLNode::XMLNodePtr& node, size_t depth) {
+        std::string indent(depth, ' ');
+        file << indent << "<" << node->getName() << ">\n";
+        file << indent << "  " << node->getValue() << "\n";
+        for (const auto& child : node->getChildren()) {
+            writeNode(child, depth + 2);
+        }
+        file << indent << "</" << node->getName() << ">\n";
+    };
+
+    writeNode(root, 0);
 }
 
 int main() {
-    std::ifstream xmlFile("xmlData.txt");
-    if (!xmlFile.is_open()) {
-        std::cerr << "Failed to open xmlData.txt\n";
-        return 1;
+    try {
+        XMLParser parser;
+        auto root = parser.parseXML("xmlData.txt");
+        saveXML(root, "output.xml");
     }
-
-    auto xmlTree = parseXml(xmlFile);
-
-    if (xmlTree) {
-        printXml(xmlTree);
-    }
-    else {
-        std::cout << "The XML tree is empty or could not be parsed.\n";
+    catch (const std::exception& e) {
+        std::cerr << "An error occurred: " << e.what() << '\n'; // stron exeption garanty
     }
 
     return 0;
