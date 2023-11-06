@@ -21,24 +21,34 @@ private:
         std::string line;
         while (std::getline(iss, line)) {
             std::istringstream lineStream(line);
-            std::string tag;
-            if (line.find("<") != std::string::npos) {
-                std::getline(lineStream, tag, '>');
-                node.name = tag.substr(1, tag.find_first_of(" />") - 1);
-                if (line.find("</") != std::string::npos) {
+            std::string keyword;
+            if (line.find("<") != std::string::npos && line.find(">") != std::string::npos) {
+                size_t startPos = line.find("<") + 1;
+                size_t endPos = line.find(">");
+                keyword = line.substr(startPos, endPos - startPos);
+                if (keyword[0] == '/') {
                     break;
                 }
+                node.name = keyword;
+                std::string restOfLine = line.substr(endPos + 1);
+                if (!restOfLine.empty() && restOfLine.find("<") != std::string::npos) {
+                    node.value = restOfLine.substr(0, restOfLine.find("<"));
+                    iss.str(restOfLine);
+                    iss.clear();
+                }
                 else {
-                    node.children[node.name] = parseNode(iss);
+                    node.children[keyword] = parseNode(iss);
                 }
             }
             else {
-                node.value = line;
+                node.value += line + "\n";
+                std::cout << 45;
             }
         }
         return node;
     }
 
+    // В этом методе мы изменяем логику сохранения, чтобы соответствовать новому формату
     void saveNode(std::ofstream& ofs, const Node& node, const std::string& indent) {
         ofs << indent << "<" << node.name << ">\n";
         if (!node.value.empty()) {

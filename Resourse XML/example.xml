@@ -1,17 +1,23 @@
-<root>
-  <first.potomok>
-    my value of first.potomok
-    <first.first.potomok>
-      my value of first.first.potomok
-    </first.first.potomok>
-  </first.potomok>
-  <second.potomok>
-    my value of second.potomok
-    <first.second.potomok>
-      my value of first.second.potomok
-    </first.second.potomok>
-    <second.second.potomok>
-      my value of second.second.potomok
-    </second.second.potomok>
-  </second.potomok>
-</root>
+<person>
+  <name>
+    <first>Vova</first>
+    <last></last>
+  </name>
+  <age>20</age>
+  <sex>Male</sex>
+  <occupation>
+    <title>Student</title>
+    <company>SPbSTU</company>
+    <location>
+      <city>Saint-Petersburg</city>
+      <country>Russia</country>
+    </location>
+  </occupation>
+  <contact>
+    <email>hi@vladimirskvortsov.com</email>
+    <phone>
+      <mobile>+7 555 555 35 35</mobile>
+      <home></home>
+    </phone>
+  </contact>
+</person>
