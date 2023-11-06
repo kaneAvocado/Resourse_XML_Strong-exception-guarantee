@@ -1,74 +1,59 @@
+#include "XmlNode.h"
+#include "XmlParser.h"
 #include <iostream>
 #include <fstream>
-#include <stack>
-#include <vector>
-#include <memory>
-#include <string>
+#include <exception>
 
-struct XmlNode {
-    std::string name;
-    std::string value;
-    std::vector<std::shared_ptr<XmlNode>> children;
-};
-
-std::shared_ptr<XmlNode> parseXml(std::istream& input) {
-    std::stack<std::shared_ptr<XmlNode>> stack;
-    std::string line;
-    std::shared_ptr<XmlNode> root, currentNode;
-
-    while (getline(input, line)) {
-        size_t startTagPos = line.find('<');
-        size_t endTagPos = line.find('>', startTagPos);
-        if (startTagPos != std::string::npos && endTagPos != std::string::npos) {
-            if (line[startTagPos + 1] != '/') { // start tag
-                currentNode = std::make_shared<XmlNode>();
-                currentNode->name = line.substr(startTagPos + 1, endTagPos - startTagPos - 1);
-                if (!stack.empty()) {
-                    stack.top()->children.push_back(currentNode);
-                }
-                stack.push(currentNode);
-                if (!root) {
-                    root = currentNode;
-                }
-            }
-            else { // end tag
-                if (!stack.empty()) {
-                    currentNode = stack.top();
-                    stack.pop();
-                }
-            }
-        }
-        else {
-            if (!stack.empty()) {
-                currentNode->value += line;
-            }
-        }
+void modifyXmlFile(const std::string& filename, const XmlNode& node) {
+    std::ofstream outFile(filename, std::ios::out);
+    if (!outFile.is_open()) {
+        throw std::runtime_error("Не удалось открыть файл для записи: " + filename);
     }
-    return root;
-}
 
-void printXml(const std::shared_ptr<XmlNode>& node, int depth = 0) {
-    std::cout << std::string(depth, ' ') << node->name << ": " << node->value << "\n";
-    for (const auto& child : node->children) {
-        printXml(child, depth + 2);
+    outFile << node.toString();
+    if (!outFile.good()) {
+        throw std::runtime_error("Произошла ошибка при записи в файл: " + filename);
     }
 }
 
 int main() {
-    std::ifstream xmlFile("xmlData.txt");
-    if (!xmlFile.is_open()) {
-        std::cerr << "Failed to open xmlData.txt\n";
+    setlocale(LC_ALL, "RUSSIAN");
+    const std::string inputFilePath = "example.xml"; // Путь к исходному файлу
+    const std::string outputFilePath = "modified_example.xml"; // Путь к файлу результатов
+
+    try {
+        std::ifstream xmlFile(inputFilePath);
+        if (!xmlFile.is_open()) {
+            throw std::runtime_error("Не удалось открыть файл: " + inputFilePath);
+        }
+
+        std::string xmlContent((std::istreambuf_iterator<char>(xmlFile)),
+                               std::istreambuf_iterator<char>());
+
+        XmlParser parser;
+        XmlNode root = parser.parse(xmlContent);
+
+        // Использование метода add для добавления узла
+        XmlNode::XmlNodeIterator addIt = root.add("newChild", "newText");
+        if (addIt.currentNode != nullptr) {
+            std::cout << "Узел добавлен: " << (*addIt).toString() << std::endl;
+        }
+
+        // Использование метода find для поиска добавленного узла
+        XmlNode::XmlNodeIterator foundIt = root.find("newChild", "newText");
+        if (foundIt.currentNode != nullptr) {
+            std::cout << "Найденный узел: " << (*foundIt).toString() << std::endl;
+        }
+
+        // Использование метода Erase для удаления узла
+        bool erased = root.Erase(foundIt);
+        std::cout << "Узел был " << (erased ? "удалён" : "не найден") << std::endl;
+
+        modifyXmlFile(outputFilePath, root); // Теперь изменения сохраняются в новый файл
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Исключение: " << e.what() << std::endl;
         return 1;
     }
-
-    auto xmlTree = parseXml(xmlFile);
-
-    if (xmlTree) {
-        printXml(xmlTree);
-    }
-    else {
-        std::cout << "The XML tree is empty or could not be parsed.\n";
-    }
-
     return 0;
 }

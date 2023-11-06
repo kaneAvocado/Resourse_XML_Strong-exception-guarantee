@@ -1,0 +1,168 @@
+<person>
+  
+
+  <age>
+    
+    
+    
+    
+    
+    20
+  
+  
+  
+  
+  
+  </age>
+  <contact>
+    
+  
+    <email>
+      
+      
+      
+      
+      
+      hi@vladimirskvortsov.com
+    
+    
+    
+    
+    
+    </email>
+    <phone>
+      
+    
+      <home>
+        
+        
+        
+        
+        
+      
+      
+      
+      
+      
+      </home>
+      <mobile>
+        
+        
+        
+        
+        
+        +7 555 555 35 35
+      
+      
+      
+      
+      
+      </mobile>
+    </phone>
+  </contact>
+  <name>
+    
+  
+    <first>
+      
+      
+      
+      
+      
+      Andrew
+    
+    
+    
+    
+    
+    </first>
+    <last>
+      
+      
+      
+      
+      
+    
+    
+    
+    
+    
+    </last>
+  </name>
+  <newChild>
+    newText
+  </newChild>
+  <occupation>
+    
+  
+    <company>
+      
+      
+      
+      
+      
+      SPbSTU
+    
+    
+    
+    
+    
+    </company>
+    <location>
+      
+    
+      <city>
+        
+        
+        
+        
+        
+        Saint-Petersburg
+      
+      
+      
+      
+      
+      </city>
+      <country>
+        
+        
+        
+        
+        
+        Russia
+      
+      
+      
+      
+      
+      </country>
+    </location>
+    <title>
+      
+      
+      
+      
+      
+      Student
+    
+    
+    
+    
+    
+    </title>
+  </occupation>
+  <sex>
+    
+    
+    
+    
+    
+    Male
+  
+  
+  
+  
+  
+  </sex>
+</person>
