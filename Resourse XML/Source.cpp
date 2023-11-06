@@ -20,18 +20,21 @@ public:
         children[child.name] = child;
     }
 
-    std::string toString() const {
+    std::string toString(const std::string& indent = "") const {
         std::ostringstream oss;
-        oss << "<" + name + "<";
+        std::string newIndent = indent + "  "; // Добавляем два пробела на каждом уровне вложенности
+
+        oss << indent << "<" + name + ">" << std::endl;
         if (!text.empty()) {
-            oss << text;
+            oss << newIndent << text << std::endl;
         }
         for (const auto& child : children) {
-            oss << child.second.toString();
+            oss << child.second.toString(newIndent);
         }
-        oss << "</" + name + ">";
+        oss << indent << "</" + name + ">" << std::endl;
+
         return oss.str();
-     }
+    }
 };
 
 class XmlParser {
