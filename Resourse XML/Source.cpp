@@ -7,23 +7,98 @@
 #include <exception>
 
 class XmlNode {
-public:
+private:
     std::string name;
     std::string text;
     std::map<std::string, XmlNode> children;
 
-    XmlNode() {}
-    XmlNode(const std::string& name) : name(name) {}
+    XmlNode(const std::string& nodeName) : name(nodeName) {}
 
-    // Добавляет потомка к узлу
-    void addChild(const XmlNode& child) {
-        children[child.name] = child;
+    friend class XmlParser; // XmlParser может создавать и изменять XmlNode
+
+public:
+    XmlNode() = default;
+
+    struct XmlNodeIterator {
+        const XmlNode* currentNode;
+        std::map<std::string, XmlNode>::const_iterator mapIt;
+
+        explicit XmlNodeIterator(const XmlNode* node)
+            : currentNode(node), mapIt(node ? node->children.cbegin() : std::map<std::string, XmlNode>::const_iterator()) {}
+
+        bool operator!=(const XmlNodeIterator& other) const {
+            // Проверка на то, что итераторы не равны, не требует проверки на end
+            return mapIt != other.mapIt;
+        }
+
+        const XmlNode& operator*() const {
+        if (!currentNode || mapIt == currentNode->children.cend()) {
+            static const XmlNode endNode; // Специальный узел для конца
+            return endNode;
+        }
+        return mapIt->second;
+        }
+
+       XmlNodeIterator& operator++() {
+        if (!currentNode || mapIt == currentNode->children.cend()) {
+            return *this; // Просто возвращаем итератор, если он уже в состоянии end
+        }
+        ++mapIt;
+        return *this;
+       }
+    };
+
+
+
+    XmlNodeIterator begin() const {
+        return XmlNodeIterator(this);
     }
+
+    XmlNodeIterator end() const {
+        return XmlNodeIterator(nullptr);
+    }
+
+    XmlNodeIterator find(const std::string& nodeName, const std::string& nodeText) const {
+        for (auto it = children.begin(); it != children.end(); ++it) {
+            if (it->second.name == nodeName && (nodeText.empty() || it->second.text == nodeText)) {
+                return XmlNodeIterator(&(it->second));
+            }
+            auto found = it->second.find(nodeName, nodeText);
+            if (found.currentNode) {
+                return found;
+            }
+        }
+        return XmlNodeIterator(nullptr);
+    }
+
+    XmlNodeIterator add(const std::string& nodeName, const std::string& nodeValue) {
+        auto it = children.find(nodeName);
+        if (it != children.end()) {
+            it->second.text = nodeValue;
+        }
+        else {
+            it = children.insert({ nodeName, XmlNode(nodeName) }).first;
+            it->second.text = nodeValue;
+        }
+        return XmlNodeIterator(&(it->second));
+    }
+
+    bool Erase(const XmlNodeIterator& iterator) {
+        // Проверяем, что currentNode не nullptr и что итератор mapIt не указывает на end
+        if (!iterator.currentNode || iterator.mapIt == children.cend()) {
+            return false;
+        }
+
+        // Удаляем узел по ключу
+        children.erase(iterator.mapIt->first);
+        return true;
+    }
+
+
 
     std::string toString(const std::string& indent = "") const {
         std::ostringstream oss;
-        std::string newIndent = indent + "  "; // Добавляем два пробела на каждом уровне вложенности
-
+        std::string newIndent = indent + "  ";
         oss << indent << "<" + name + ">" << std::endl;
         if (!text.empty()) {
             oss << newIndent << text << std::endl;
@@ -32,7 +107,6 @@ public:
             oss << child.second.toString(newIndent);
         }
         oss << indent << "</" + name + ">" << std::endl;
-
         return oss.str();
     }
 };
@@ -40,9 +114,9 @@ public:
 class XmlParser {
 public:
     XmlNode parse(const std::string& xml) {
-        std::vector<XmlNode> nodeStack;
+        std::vector<XmlNode*> nodeStack;
         std::string currentText;
-        XmlNode rootNode;
+        XmlNode* rootNode = nullptr;
 
         for (size_t i = 0; i < xml.size(); ++i) {
             if (xml[i] == '<') {
@@ -50,7 +124,7 @@ public:
                     if (nodeStack.empty()) {
                         throw std::runtime_error("No opening tag for text content");
                     }
-                    nodeStack.back().text = currentText;
+                    nodeStack.back()->text = currentText;
                     currentText.clear();
                 }
                 size_t closeTag = xml.find('>', i);
@@ -63,17 +137,18 @@ public:
                     if (nodeStack.empty()) {
                         throw std::runtime_error("No opening tag for closing tag");
                     }
-                    XmlNode completedNode = nodeStack.back();
+                    XmlNode* completedNode = nodeStack.back();
                     nodeStack.pop_back();
                     if (nodeStack.empty()) {
                         rootNode = completedNode;
                     }
                     else {
-                        nodeStack.back().addChild(completedNode);
+                        nodeStack.back()->children[completedNode->name] = *completedNode;
+                        delete completedNode; // Удаляем узел после добавления в детей
                     }
                 }
                 else {
-                    nodeStack.emplace_back(tagName);
+                    nodeStack.push_back(new XmlNode(tagName));
                 }
                 i = closeTag;
             }
@@ -84,33 +159,64 @@ public:
         if (!nodeStack.empty()) {
             throw std::runtime_error("Malformed XML: Tags left open");
         }
-        return rootNode;
+        if (!rootNode) {
+            throw std::runtime_error("No root node found");
+        }
+        return *rootNode; // Возвращаем копию корня
     }
+
 };
 
+void modifyXmlFile(const std::string& outputPath, const XmlNode& rootNode) {
+    std::ofstream outFile(outputPath, std::ios::out);
+    if (!outFile.is_open()) {
+        throw std::runtime_error("Не удалось открыть файл для записи: " + outputPath);
+    }
 
-void modifyXmlFile(const std::string& filePath, const XmlNode& rootNode) {
-    std::ofstream outFile(filePath);
     outFile << rootNode.toString();
     if (!outFile.good()) {
-        throw std::runtime_error("Error occurred while writing to file: " + filePath);
+        throw std::runtime_error("Произошла ошибка при записи в файл: " + outputPath);
     }
 }
 
+
 int main() {
-    const std::string filePath = "example.xml";
+    setlocale(LC_ALL, "RUSSIAN");
+    const std::string inputFilePath = "example.xml"; // Путь к исходному файлу
+    const std::string outputFilePath = "modified_example.xml"; // Путь к файлу результатов
+
     try {
-        std::ifstream xmlFile(filePath);
-        std::string xmlContent((std::istreambuf_iterator<char>(xmlFile)), std::istreambuf_iterator<char>());
+        std::ifstream xmlFile(inputFilePath);
+        if (!xmlFile.is_open()) {
+            throw std::runtime_error("Не удалось открыть файл: " + inputFilePath);
+        }
+
+        std::string xmlContent((std::istreambuf_iterator<char>(xmlFile)),
+            std::istreambuf_iterator<char>());
 
         XmlParser parser;
         XmlNode root = parser.parse(xmlContent);
 
-        modifyXmlFile(filePath, root);
+        XmlNode::XmlNodeIterator addIt = root.add("newChild", "newText");
+        if (addIt.currentNode != nullptr) {
+            std::cout << "Узел добавлен: " << addIt.currentNode->toString() << std::endl;
+        }
+
+        // Демонстрация работы метода Erase
+        XmlNode::XmlNodeIterator addIt = root.add("ChildToDelete", "TextToDelete");
+        if (addIt.currentNode != nullptr) {
+            std::cout << "Добавленный узел: " << (*addIt).toString() << std::endl;
+        }
+
+        bool erased = root.Erase(addIt);
+        std::cout << "Узел был " << (erased ? "удалён" : "не найден") << std::endl;
+
+        modifyXmlFile(outputFilePath, root); // Теперь изменения сохраняются в новый файл
     }
     catch (const std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        std::cerr << "Исключение: " << e.what() << std::endl;
         return 1;
     }
     return 0;
 }
+
